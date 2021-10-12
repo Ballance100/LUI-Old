@@ -82,6 +82,16 @@ function CursorFunctions.IsHovering(objX,objY,objWid,objHei)--Checks if the user
 			end
 		end
 	end
+
+function CursorFunctions.clickedAnywhere(Button)--Button:1 is left click/mobile tap. Button: 2 is right click/touch held
+	if love.mouse.isDown(Button) then
+		return true
+	end
+
+end
+
+
+
 function CursorFunctions.IsClicked(type,objX,objY,objWid,objHei)
 	if love.mouse.isDown(type) then
 		local MouseX,MouseY = love.mouse.getPosition()

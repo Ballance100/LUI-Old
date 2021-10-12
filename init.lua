@@ -52,7 +52,7 @@ function LUID:newLabel(X,Y,Wid,Hei,Mis)
 
   self.Contents[#self.Contents+1] = {Type="Label",Enabled=true,X=X+self.X,Y=Y+self.Y,Wid=Wid,Hei=Hei,
   Text=Mis.Text, textColour=Mis.textColour,textOffset=Mis.textOffset,Font=Mis.Font,CenterText=Mis.CenterText,
-  BGColour=Mis.BGColour,BGImage=Mis.BGImage,FClipping=Mis.FrameClipping,Fill=Mis.Fill,
+  BGColour=Mis.BGColour,BGImage=Mis.BGImage,FClipping=Mis.frameClipping,Fill=Mis.Fill,
 
   isHovering = LUID.isHovering,
 
@@ -71,7 +71,7 @@ function LUID:newButton(X,Y,Wid,Hei,Mis)
   self.Contents[#self.Contents+1] = {Type="Button",Enabled=true,X=X+self.X,Y=Y+self.Y,Wid=Wid,Hei=Hei,
   Text=Mis.Text, Font=Mis.Font,textAlign=Mis.textAlign,
   BGColour=Mis.BGColour,BGImage=Mis.BGImage,hoveringBGImage=Mis.hoveringBGImage,clickedBGImage=Mis.clickedBGImage,
-  BFClipping=Mis.FrameClipping,Fill=Mis.Fill,
+  BFClipping=Mis.frameClipping,Fill=Mis.Fill,
   RY=Mis.RX,RX=Mis.RX,Segments=Mis.Segments,
 
   textColour=Mis.textColour,
@@ -96,7 +96,7 @@ function LUID:newTextBox(X,Y,Wid,Font,Mis)
   if Mis.textAlign == nil then Mis.textAlign = "left" end
 
   self.Contents[#self.Contents+1] = {Type="textBox",Enabled=true,X=X+self.X,Y=Y+self.Y,Wid=Wid,Hei=Font:getHeight(),
-  Text=Mis.Text, Font=Font,textAlign=Mis.textAlign,BGColour=Mis.BGColour,FClipping=Mis.FrameClipping,Fill=Mis.Fill,
+  Text=Mis.Text, Font=Font,textAlign=Mis.textAlign,BGColour=Mis.BGColour,FClipping=Mis.frameClipping,Fill=Mis.Fill,
   RY=Mis.RX,RX=Mis.RX,Segments=Mis.Segments,
 
   CurHeight=0,smoothCursor=Mis.smoothCursor,textColour=Mis.textColour,cursorBlinkSpeed=Mis.cursorBlinkSpeed,
@@ -125,7 +125,8 @@ function LUID:newFrame(xPos,yPos,Wid,Hei,Mis)
   if Mis == nil then Mis = {} end
 
   self.Frames[#self.Frames+1] = {Type="Frame",Enabled=true,X=xPos,Y=yPos,Wid=Wid,Hei=Hei,
-  BGColour=Mis.BGColour,BGImage=Mis.BGImage,FrameClipping=Mis.FrameClipping, Frames={},Contents={},
+  BGColour=Mis.BGColour,BGImage=Mis.BGImage,frameClipping=Mis.frameClipping,RX=Mis.RX,RY=Mis.RY,Segments = Mis.Segments,
+  scrollwheelY=0,scrollwheelX=0--[[On a normal frame scrollwheelPos is a constant 0]],Frames={},Contents={},
 
   newLabel = LUID.newLabel,
   newTextBox=LUID.newTextBox,
@@ -143,13 +144,20 @@ end
 
 function LUID:newScrollableFrame(xPos,yPos,Wid,Hei,Mis)
   if Mis == nil then Mis = {} end
-  if Mis.scrollwheelDimensions == nil then Mis.scrollwheelDimensions = {{Wid=40,Hei=40}} end
+  if Mis.scrollwheelDimensions == nil then Mis.scrollwheelDimensions = {Wid=40,Hei=40} end
   if Mis.scrollwheelColour == nil then Mis.scrollwheelColour = {.1,.1,.1} end
+  if Mis.scrollwheelHoveringColour == nil then Mis.scrollwheelHoveringColour = Mis.scrollwheelColour end     
+  if Mis.scrollWheelSelectedColour ==  nil then Mis.scrollWheelSelectedColour = Mis.scrollwheelHoveringColour end
+  if Mis.scrollwheelSpacing == nil then Mis.scrollwheelSpacing = {0,0} end
 
   self.Frames[#self.Frames+1] = {Type="scrollableFrame",Enabled=true,X=xPos,Y=yPos,Wid=Wid,Hei=Hei,
-  BGColour=Mis.BGColour,BGImage=Mis.BGImage,FrameClipping=Mis.FrameClipping,
-  scrollwheelColour=Mis.scrollwheelColour, scrollwheelImage=Mis.scrollwheelImage,xContent=0,yContent=0,--Refers to how much the scroll wheel should scale
+  BGColour=Mis.BGColour,BGImage=Mis.BGImage,frameClipping=true,RX=Mis.RX,RY=Mis.RY,Segemts=Mis.Segments,--frameClipping is always true on a scrollable frame
+  scrollwheelColour = Mis.scrollwheelColour,  scrollwheelHoveringColour = Mis.scrollwheelHoveringColour,
+  scrollwheelSelectedColour=Mis.scrollwheelSelectedColour   ,scrollwheelImage=Mis.scrollwheelImage,
+  SWRX = Mis.SWRX,SWRY = Mis.SWRY,scrollwheelSpacing = Mis.scrollwheelSpacing,--Edge radius of scroll wheel rectangle
+  xContent=0,yContent=0,--Refers to how much the scroll wheel should scale
   scrollwheelDimensions=Mis.scrollwheelDimensions,scrollwheelX=0,scrollwheelY=0,
+  isHolding = false,--Is holding scroll wheel. Means that user can move their cursor more freely when scroling
    Frames={},Contents={},
 
   newLabel = LUID.newLabel,
@@ -202,8 +210,19 @@ function LUI:Update(dt)
     end
   end
 
+
+
   local function updateFrames(Index,Frame)
+    local xCount = 0--Used to tell how much stuff is in a scrollable Frame
+    local yCount = 0
+    local CurPosPrevX,curPosPrevY = 0,0
       for k,y in ipairs(Frame.Contents) do
+
+        if y.X+y.Wid >= xCount then xCount = y.X+y.Wid-Frame.X end
+        if y.Y+y.Hei >= yCount then yCount = y.Y+y.Hei-Frame.Y end
+
+      
+
         if y.Type == "textBox" then
           if CurFun.IsHovering(y.X,y.Y,y.Wid,y.Hei) then
             love.mouse.setCursor(ICursor)
@@ -218,6 +237,37 @@ function LUI:Update(dt)
           end
         end
       end
+      if Frame.Type == "scrollableFrame" then 
+        local Height = Frame.Hei*Frame.Hei/Frame.yContent
+          local yCon = Frame.Hei/Frame.yContent
+          if Frame.Y+Height-Frame.scrollwheelY*yCon > Frame.Y+Frame.Hei then Frame.scrollwheelY = -Frame.yContent+Frame.Hei end
+        
+
+          --Scrolling
+          if Frame.isHolding == true then
+
+          if CurFun.clickedAnywhere(1) then
+            local mouse_diff = prevCurPosY - curCurPosY
+            Frame.scrollwheelY =   mouse_diff/yCon
+            
+            if Frame.Y+Height-Frame.scrollwheelY*yCon > Frame.Y+Frame.Hei then Frame.scrollwheelY = -Frame.yContent+Frame.Hei 
+            elseif Frame.Y-Frame.scrollwheelY*yCon < Frame.Y then Frame.scrollwheelY = 0 end
+          else Frame.isHolding = false
+          end
+        end
+        Frame.xContent = xCount Frame.yContent = yCount 
+        curCurPosX,curCurPosY = love.mouse.getPosition()
+
+  
+        if CurFun.IsClicked(1,Frame.X+Frame.Wid-Frame.scrollwheelDimensions.Wid,
+        Frame.Y-Frame.scrollwheelY*yCon,
+        Frame.scrollwheelDimensions.Wid,
+        Frame.Hei*Frame.Hei/Frame.yContent) and  Frame.isHolding == false then
+          Frame.isHolding = true
+          prevCurPosX,prevCurPosY = love.mouse.getPosition()
+          if Frame.scrollwheelY ~= nil then prevCurPosY = prevCurPosY+Frame.scrollwheelY*yCon end
+        end
+      end
   end
 
   local function findFrames(Frame)
@@ -227,6 +277,8 @@ function LUI:Update(dt)
     end
   end
   findFrames(LUI)
+
+
 end
 
 
@@ -248,29 +300,14 @@ function LUI:Draw()
 
       if Frame.BGImage ~= nil then
         love.graphics.draw(Frame.BGImage,Frame.X,Frame.Y)
-      else love.graphics.rectangle("fill",Frame.X*scaleX,Frame.Y*scaleY,Frame.Wid*sizeScaleX,Frame.Hei*sizeScaleY) end
+      else love.graphics.rectangle("fill",Frame.X*scaleX,Frame.Y*scaleY,Frame.Wid*sizeScaleX,Frame.Hei*sizeScaleY,Frame.RX,Frame.RY,Frame.Segments) end
       if Frame.BGColour ~= nil then love.graphics.setColor(PR,PG,PB,PA) end
-
-      if Frame.Type == "scrollableFrame" then
-        print("F",Frame.scrollwheelColour)
-        love.graphics.setColor(Frame.scrollwheelColour)
-        love.graphics.rectangle("fill",
-        Frame.X+Frame.Wid-Frame.scrollwheelDimensions[1].Wid,
-        Frame.Y,
-        Frame.scrollwheelDimensions[1].Wid,
-        Frame.scrollwheelDimensions[1].Hei
-        )
-  
-        if Frame.scrollwheelDimensions[2] ~= nil then--Bottom (Y-Axis) Scrollbar
-  
-        end
-      end
 
 
       --UI elements
         for k,y in ipairs(Frame.Contents) do
           local PR,PG,PB,PA = love.graphics.getColor()--Previous Blue,Red,Green and alpha
-          if Frame.FrameClipping == true then
+          if Frame.frameClipping == true then
             love.graphics.stencil(Frame.Stencil,"replace",1)
             love.graphics.setStencilTest("greater",0)
           end
@@ -283,9 +320,10 @@ function LUI:Draw()
             end
 
             if y.BGImage ~= nil then
-              love.graphics.draw(y.BGImage,y.X,y.Y,0,y.Wid/y.BGImage:getWidth(),y.Hei/y.BGImage:getHeight())
+              love.graphics.draw(y.BGImage,y.X+Frame.scrollwheelX,y.Y+Frame.scrollwheelY,0,
+              y.Wid/y.BGImage:getWidth(),y.Hei/y.BGImage:getHeight())
             else
-            love.graphics.rectangle(y.Fill,y.X*sizeScaleX,y.Y*sizeScaleY,y.Wid*sizeScaleX,y.Hei*sizeScaleY,y.RX,y.RY,y.Segments)
+            love.graphics.rectangle(y.Fill,y.X+Frame.scrollwheelX*sizeScaleX,y.Y+Frame.scrollwheelY*sizeScaleY,y.Wid*sizeScaleX,y.Hei*sizeScaleY,y.RX,y.RY,y.Segments)
             end
             if y.BGColour ~= nil then love.graphics.setColor(PR,PG,PB,PA) end
 
@@ -351,9 +389,45 @@ function LUI:Draw()
             love.graphics.setStencilTest()
           end
         end
+
+
+        if Frame.Type == "scrollableFrame" then
+          yCon = Frame.Hei/Frame.yContent--percentage of frame covered divided by 100.IE 100 percent would be 1
+
+          if Frame.isHolding==true then
+          love.graphics.setColor(Frame.scrollwheelSelectedColour)
+          elseif CurFun.IsHovering(Frame.X+Frame.Wid-Frame.scrollwheelDimensions.Wid,
+            Frame.Y-Frame.scrollwheelY*yCon,
+            Frame.scrollwheelDimensions.Wid,
+            Frame.Hei*Frame.Hei/Frame.yContent) then
+              love.graphics.setColor(Frame.scrollwheelHoveringColour)
+            else love.graphics.setColor(Frame.scrollwheelColour)
+          end
+  
+  
+        
+          if Frame.Hei*Frame.Hei/Frame.yContent < Frame.Hei then--Should be less than 1 not Frame.Hei
+            love.graphics.rectangle("fill",
+            Frame.X+Frame.Wid-Frame.scrollwheelDimensions.Wid+Frame.scrollwheelSpacing[1],
+            Frame.Y+Frame.scrollwheelSpacing[2]-Frame.scrollwheelY*yCon,
+            Frame.scrollwheelDimensions.Wid,
+            Frame.Hei*Frame.Hei/Frame.yContent,
+            Frame.SWRX,--Scroll wheel edge radius(X)
+            Frame.SWRY
+            )
+         
+          end
+    
+          if Frame.scrollwheelDimensions[2] ~= nil then--Bottom (Y-Axis) Scrollbar
+    
+          end
+        end
     love.graphics.setStencilTest()
     love.graphics.setColor(PR,PG,PB,PA)
+
   end
+
+
 
   local function findFrames(Frames)
     for i,v in ipairs(Frames.Frames) do
