@@ -1,6 +1,6 @@
 
 
-local LUI = {Frames={},Settings={scaleX,scaleY},selectedTextBox=nil}
+local LUI = {Frames={},Settings={scaleX,scaleY},selectedTextBox=nil}--
 
 local scaleX,scaleY
 
