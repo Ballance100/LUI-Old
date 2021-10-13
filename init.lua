@@ -148,16 +148,16 @@ function LUID:newScrollableFrame(xPos,yPos,Wid,Hei,Mis)
   if Mis.scrollwheelColour == nil then Mis.scrollwheelColour = {.1,.1,.1} end
   if Mis.scrollwheelHoveringColour == nil then Mis.scrollwheelHoveringColour = Mis.scrollwheelColour end     
   if Mis.scrollWheelSelectedColour ==  nil then Mis.scrollWheelSelectedColour = Mis.scrollwheelHoveringColour end
-  if Mis.scrollwheelSpacing == nil then Mis.scrollwheelSpacing = {0,0} end
+  if Mis.scrollwheelOffset == nil then Mis.scrollwheelOffset = {0,0} end
 
   self.Frames[#self.Frames+1] = {Type="scrollableFrame",Enabled=true,X=xPos,Y=yPos,Wid=Wid,Hei=Hei,
   BGColour=Mis.BGColour,BGImage=Mis.BGImage,frameClipping=true,RX=Mis.RX,RY=Mis.RY,Segemts=Mis.Segments,--frameClipping is always true on a scrollable frame
   scrollwheelColour = Mis.scrollwheelColour,  scrollwheelHoveringColour = Mis.scrollwheelHoveringColour,
   scrollwheelSelectedColour=Mis.scrollwheelSelectedColour   ,scrollwheelImage=Mis.scrollwheelImage,
-  SWRX = Mis.SWRX,SWRY = Mis.SWRY,scrollwheelSpacing = Mis.scrollwheelSpacing,--Edge radius of scroll wheel rectangle
+  SWRX = Mis.SWRX,SWRY = Mis.SWRY,scrollwheelOffset = Mis.scrollwheelOffset,--Edge radius of scroll wheel rectangle
   xContent=0,yContent=0,--Refers to how much the scroll wheel should scale
   scrollwheelDimensions=Mis.scrollwheelDimensions,scrollwheelX=0,scrollwheelY=0,
-  isHolding = false,--Is holding scroll wheel. Means that user can move their cursor more freely when scroling
+  isHoldingYScroll = false,isHoldingXScroll=false,--Is holding scroll wheel. Means that user can move their cursor more freely when scroling
    Frames={},Contents={},
 
   newLabel = LUID.newLabel,
@@ -240,32 +240,64 @@ function LUI:Update(dt)
       if Frame.Type == "scrollableFrame" then 
         local Height = Frame.Hei*Frame.Hei/Frame.yContent
           local yCon = Frame.Hei/Frame.yContent
+          local xCon = Frame.Wid*Frame.Wid/Frame.xContent
           if Frame.Y+Height-Frame.scrollwheelY*yCon > Frame.Y+Frame.Hei then Frame.scrollwheelY = -Frame.yContent+Frame.Hei end
         
 
           --Scrolling
-          if Frame.isHolding == true then
+          if Frame.isHoldingYScroll == true then
 
           if CurFun.clickedAnywhere(1) then
             local mouse_diff = prevCurPosY - curCurPosY
-            Frame.scrollwheelY =   mouse_diff/yCon
+            Frame.scrollwheelY =  mouse_diff/yCon
             
             if Frame.Y+Height-Frame.scrollwheelY*yCon > Frame.Y+Frame.Hei then Frame.scrollwheelY = -Frame.yContent+Frame.Hei 
             elseif Frame.Y-Frame.scrollwheelY*yCon < Frame.Y then Frame.scrollwheelY = 0 end
-          else Frame.isHolding = false
+          else Frame.isHoldingYScroll = false
+            end
           end
+
+
+
+          print(Frame.isHoldingXScroll)
+        if Frame.isHoldingXScroll == true then
+          if CurFun.clickedAnywhere(1) then
+            local mouse_diff = prevCurPosX - curCurPosX
+            Frame.scrollwheelY =  mouse_diff/xCon
+            if Frame.X+Height-Frame.scrollwheelX*xCon > Frame.X+Frame.Wid then Frame.scrollwheelX = -Frame.xContent+Frame.Wid 
+            elseif Frame.x-Frame.scrollwheelY*xCon < Frame.X then Frame.scrollwheelX = 0 end
+          else Frame.isHoldingXScroll = false
+          end          
+
         end
+
+
+
         Frame.xContent = xCount Frame.yContent = yCount 
         curCurPosX,curCurPosY = love.mouse.getPosition()
 
   
-        if CurFun.IsClicked(1,Frame.X+Frame.Wid-Frame.scrollwheelDimensions.Wid,
+        if CurFun.IsClicked(1,Frame.X+Frame.Wid-Frame.scrollwheelDimensions.Wid+Frame.scrollwheelOffset[2],
         Frame.Y-Frame.scrollwheelY*yCon,
         Frame.scrollwheelDimensions.Wid,
-        Frame.Hei*Frame.Hei/Frame.yContent) and  Frame.isHolding == false then
-          Frame.isHolding = true
+        Frame.Hei*Frame.Hei/Frame.yContent) and  Frame.isHoldingYScroll == false then
+          Frame.isHoldingYScroll = true
           prevCurPosX,prevCurPosY = love.mouse.getPosition()
           if Frame.scrollwheelY ~= nil then prevCurPosY = prevCurPosY+Frame.scrollwheelY*yCon end
+
+
+
+
+
+          if CurFun.IsClicked(1,Frame.X+Frame.scrollwheelOffset[2]-Frame.scrollwheelX*xCon,
+          Frame.Y+Frame.Hei-Frame.scrollwheelDimensions.Hei+Frame.scrollwheelOffset[2],
+          Frame.Wid*Frame.Wid/Frame.xContent,
+          Frame.scrollwheelDimensions.Hei) and  Frame.isHoldingXScroll == false then
+
+            Frame.isHoldingXScroll = true
+            prevCurPosX,prevCurPosY = love.mouse.getPosition()
+             --prevCurPosX = prevCurPosX+Frame.scrollwheelX*xCon
+          end
         end
       end
   end
@@ -392,24 +424,25 @@ function LUI:Draw()
 
 
         if Frame.Type == "scrollableFrame" then
-          yCon = Frame.Hei/Frame.yContent--percentage of frame covered divided by 100.IE 100 percent would be 1
+          local xCon = Frame.Wid/Frame.xContent
+          local yCon = Frame.Hei/Frame.yContent--percentage of frame covered divided by 100.IE 100 percent would be 1
 
-          if Frame.isHolding==true then
+          if Frame.isHoldingYScroll==true then
           love.graphics.setColor(Frame.scrollwheelSelectedColour)
-          elseif CurFun.IsHovering(Frame.X+Frame.Wid-Frame.scrollwheelDimensions.Wid,
-            Frame.Y-Frame.scrollwheelY*yCon,
-            Frame.scrollwheelDimensions.Wid,
-            Frame.Hei*Frame.Hei/Frame.yContent) then
+          elseif CurFun.IsHovering(Frame.X+Frame.Wid-Frame.scrollwheelDimensions.Wid+Frame.scrollwheelOffset[2],
+          Frame.Y+Frame.scrollwheelOffset[2]-Frame.scrollwheelY*yCon,
+          Frame.scrollwheelDimensions.Wid,
+          Frame.Hei*Frame.Hei/Frame.yContent) then
               love.graphics.setColor(Frame.scrollwheelHoveringColour)
             else love.graphics.setColor(Frame.scrollwheelColour)
           end
   
   
-        
+        --Right hand side Y-Axis scrollbar
           if Frame.Hei*Frame.Hei/Frame.yContent < Frame.Hei then--Should be less than 1 not Frame.Hei
             love.graphics.rectangle("fill",
-            Frame.X+Frame.Wid-Frame.scrollwheelDimensions.Wid+Frame.scrollwheelSpacing[1],
-            Frame.Y+Frame.scrollwheelSpacing[2]-Frame.scrollwheelY*yCon,
+            Frame.X+Frame.Wid-Frame.scrollwheelDimensions.Wid+Frame.scrollwheelOffset[2],
+            Frame.Y+Frame.scrollwheelOffset[2]-Frame.scrollwheelY*yCon,
             Frame.scrollwheelDimensions.Wid,
             Frame.Hei*Frame.Hei/Frame.yContent,
             Frame.SWRX,--Scroll wheel edge radius(X)
@@ -417,10 +450,28 @@ function LUI:Draw()
             )
          
           end
-    
-          if Frame.scrollwheelDimensions[2] ~= nil then--Bottom (Y-Axis) Scrollbar
-    
+
+
+          if Frame.isHoldingXScroll==true then
+          love.graphics.setColor(Frame.scrollwheelSelectedColour)
+          elseif CurFun.IsHovering(Frame.X+Frame.scrollwheelOffset[2]-Frame.scrollwheelX*xCon,
+          Frame.Y+Frame.Hei-Frame.scrollwheelDimensions.Hei+Frame.scrollwheelOffset[2],
+          Frame.Wid*Frame.Wid/Frame.xContent,
+          Frame.scrollwheelDimensions.Hei) then
+              love.graphics.setColor(Frame.scrollwheelHoveringColour)
+            else love.graphics.setColor(Frame.scrollwheelColour)
           end
+    
+
+          --Bottom X-axis scrollbar
+          love.graphics.rectangle("fill",
+          Frame.X+Frame.scrollwheelOffset[2]-Frame.scrollwheelX*xCon,
+          Frame.Y+Frame.Hei-Frame.scrollwheelDimensions.Hei+Frame.scrollwheelOffset[2],
+          Frame.Wid*Frame.Wid/Frame.xContent,
+          Frame.scrollwheelDimensions.Hei,
+          Frame.SWRX,
+          Frame.SWRY)
+
         end
     love.graphics.setStencilTest()
     love.graphics.setColor(PR,PG,PB,PA)
